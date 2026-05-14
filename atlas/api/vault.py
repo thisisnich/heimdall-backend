@@ -117,20 +117,168 @@ async def get_file(file_path: str):
 async def update_file(file_path: str, update: FileUpdate):
     """Update the content of a specific file in the vault."""
     # Security: ensure path doesn't escape vault root
-    file_path = Path(file_path)
-    if ".." in str(file_path) or file_path.is_absolute():
-        raise HTTPException(status_code=400, detail="Invalid path")
-    
     full_path = VAULT_ROOT / file_path
+    try:
+        full_path.resolve().relative_to(VAULT_ROOT.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
+    # Security: only allow .md files
+    if not full_path.suffix.lower() == ".md":
+        raise HTTPException(status_code=400, detail="Only .md files can be updated")
+    
     if not full_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not full_path.suffix == ".md":
-        raise HTTPException(status_code=400, detail="Only markdown files supported")
+    try:
+        full_path.write_text(update.content, encoding="utf-8")
+        return {"status": "success", "path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ingest")
+async def ingest_file(upload: FileUpload):
+    """Ingest a file and convert it to markdown in the vault."""
+    from markitdown import MarkItDown
+    from datetime import date
+    import re
+    import tempfile
+    import os
     
-    full_path.write_text(update.content, encoding="utf-8")
-    return {
-        "status": "updated",
-        "path": str(file_path),
-        "size": full_path.stat().st_size,
+    # Course mapping
+    COURSE_MAP = {
+        "EGE353": "EGE353 Autonomous Robotics",
+        "EGE320": "EGE320 Embedded System Design &Technology",
+        "EGE321": "EGE321 Wireless Communication & Networking",
+        "EGE351": "EGE351 Automatino Systems & Control",
+        "EGE322": "EGE322 IOT System Project",
+        "EGE301": "EGE301 Communication & Workplace Success",
     }
+    
+    COURSE_PATTERNS = [r"EGE\d{3}", r"EGE\d{3}[A-Z]?"]
+    
+    def detect_course(content: str) -> str:
+        """Detect course code from content."""
+        for pattern in COURSE_PATTERNS:
+            matches = re.findall(pattern, content)
+            if matches:
+                course = matches[0].upper()
+                if course in COURSE_MAP:
+                    return course
+        return "FILL_IN"
+    
+    def format_markdown(content: str) -> str:
+        """Format markdown content with better structure."""
+        lines = content.split('\n')
+        formatted = []
+        in_frontmatter = False
+        
+        for line in lines:
+            # Skip existing frontmatter
+            if line.strip() == '---':
+                if not in_frontmatter:
+                    in_frontmatter = True
+                    continue
+                else:
+                    in_frontmatter = False
+                    continue
+            if in_frontmatter:
+                continue
+            
+            stripped = line.strip()
+            
+            # Detect and format headers based on common patterns
+            if stripped.isupper() and len(stripped) < 50 and stripped and not stripped.startswith('Page'):
+                if any(keyword in stripped.lower() for keyword in ['objectives', 'equipment', 'components', 'tasks', 'understandings', 'questions']):
+                    formatted.append(f"\n## {stripped}\n")
+                elif any(keyword in stripped.lower() for keyword in ['task', 'question']):
+                    formatted.append(f"\n### {stripped}\n")
+                else:
+                    formatted.append(f"\n# {stripped}\n")
+            elif stripped and len(stripped) > 1 and stripped[0].isdigit() and stripped[1] in [')', '.']:
+                # Numbered list items
+                formatted.append(f"- {stripped}")
+            elif stripped.startswith(('a)', 'b)', 'c)', 'd)')):
+                # Lettered list items
+                formatted.append(f"- {stripped}")
+            elif stripped:
+                formatted.append(stripped)
+        
+        return '\n'.join(formatted)
+    
+    try:
+        # Create temporary file for conversion
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(upload.filename)[1]) as tmp_file:
+            tmp_file.write(upload.content.encode('utf-8'))
+            tmp_path = tmp_file.name
+        
+        # Convert to markdown
+        md = MarkItDown()
+        result = md.convert(tmp_path)
+        body = result.text_content or ""
+        
+        # Clean up temp file
+        os.unlink(tmp_path)
+        
+        # Detect course from content
+        course = detect_course(body)
+        
+        # Format the markdown content
+        formatted_body = format_markdown(body)
+        
+        # Create frontmatter
+        frontmatter = f"""---
+tags:
+  - {course}
+  - FILL_IN
+course: {course}
+topic: FILL_IN
+source: {upload.filename}
+converted: {date.today().isoformat()}
+---
+
+"""
+        
+        # Determine output path
+        folder_name = COURSE_MAP.get(course)
+        if folder_name:
+            dest_folder = VAULT_ROOT / folder_name
+            if dest_folder.exists():
+                # Save to course folder
+                stem = os.path.splitext(upload.filename)[0]
+                out_path = dest_folder / (stem + ".md")
+                counter = 1
+                while out_path.exists():
+                    out_path = dest_folder / f"{stem}_{counter}.md"
+                    counter += 1
+                out_path.write_text(frontmatter + formatted_body, encoding="utf-8")
+                return {
+                    "status": "success",
+                    "path": str(out_path.relative_to(VAULT_ROOT)),
+                    "course": course,
+                    "message": f"Converted and saved to {folder_name}"
+                }
+        
+        # Fall back to work/fyp if course folder not found
+        dest_folder = VAULT_ROOT / "work" / "fyp"
+        dest_folder.mkdir(parents=True, exist_ok=True)
+        stem = os.path.splitext(upload.filename)[0]
+        out_path = dest_folder / (stem + ".md")
+        counter = 1
+        while out_path.exists():
+            out_path = dest_folder / f"{stem}_{counter}.md"
+            counter += 1
+        out_path.write_text(frontmatter + formatted_body, encoding="utf-8")
+        
+        return {
+            "status": "success",
+            "path": str(out_path.relative_to(VAULT_ROOT)),
+            "course": course,
+            "message": f"Converted and saved to work/fyp (course folder not found)"
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="markitdown not installed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -15,6 +15,7 @@ from atlas.api.goals import router as goals_router
 from atlas.api.knowledge_graph import router as graph_router
 from atlas.api.dev import router as dev_router
 from atlas.api.calendar import router as calendar_router
+from atlas.api.telegram import router as telegram_router
 from atlas.db.vector_store import init_vector_tables
 from atlas.db.session import get_session
 from atlas.db.models import User
@@ -49,6 +50,7 @@ app.include_router(goals_router)
 app.include_router(graph_router)
 app.include_router(dev_router)
 app.include_router(calendar_router)
+app.include_router(telegram_router)
 
 
 async def ensure_default_user():

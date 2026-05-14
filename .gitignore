@@ -1,0 +1,43 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.windsurf/
+
+# Logs
+*.log
+server.log
+
+# Database
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Next.js (if present)
+nextjs-dashboard/node_modules/
+nextjs-dashboard/.next/
+nextjs-dashboard/out/
+nextjs-dashboard/build/
+
+# Vault (local data)
+vault/
+
+# Docker volumes
+docker-compose.yml.save

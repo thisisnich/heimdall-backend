@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEIMDALL // SYSTEM_STATUS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --accent-cyan: #00f0ff;
+            --accent-magenta: #ff00aa;
+            --accent-green: #00ff88;
+            --accent-orange: #ff6b35;
+            --accent-red: #ff0040;
+            --text-primary: #ffffff;
+            --text-secondary: #8b8b9e;
+            --text-muted: #5a5a6e;
+            --border-color: #2a2a3a;
+            --grid-line: #1f1f2e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scanline effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 240, 255, 0.03) 0px,
+                transparent 1px,
+                transparent 2px,
+                rgba(0, 240, 255, 0.03) 3px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+        }
+
+        /* Header Section */
+        .header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 40px;
+            margin-bottom: 50px;
+            padding: 30px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            animation: headerPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes headerPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header-title h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            letter-spacing: 0.2em;
+        }
+
+        .header-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .header-stat {
+            text-align: right;
+            padding: 15px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent-cyan);
+        }
+
+        .header-stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+        }
+
+        .header-stat-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Overall Progress */
+        .progress-section {
+            margin-bottom: 50px;
+            padding: 30px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .progress-section::after {
+            content: 'SYSTEM_STATUS';
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 0.3em;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 25px;
+        }
+
+        .progress-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .progress-percentage {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--accent-green);
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        .progress-bar-container {
+            background: var(--bg-secondary);
+            height: 40px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                var(--accent-cyan) 0%, 
+                var(--accent-green) 50%,
+                var(--accent-magenta) 100%);
+            position: relative;
+            animation: progressShine 2s ease-in-out infinite;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+        }
+
+        @keyframes progressShine {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(0, 0, 0, 0.1) 10px,
+                rgba(0, 0, 0, 0.1) 20px
+            );
+        }
+
+        /* Phases Grid */
+        .phases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .phase-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .phase-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 240, 255, 0.1);
+        }
+
+        .phase-card.completed {
+            border-left: 4px solid var(--accent-green);
+        }
+
+        .phase-card.in-progress {
+            border-left: 4px solid var(--accent-orange);
+        }
+
+        .phase-card.pending {
+            border-left: 4px solid var(--text-muted);
+        }
+
+        .phase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+        }
+
+        .phase-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-primary);
+        }
+
+        .phase-status {
+            font-size: 0.75rem;
+            padding: 5px 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 700;
+        }
+
+        .phase-status.complete {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+
+        .phase-status.active {
+            background: rgba(255, 107, 53, 0.1);
+            color: var(--accent-orange);
+            border: 1px solid var(--accent-orange);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .phase-status.pending {
+            background: rgba(90, 90, 110, 0.1);
+            color: var(--text-muted);
+            border: 1px solid var(--text-muted);
+        }
+
+        .task-list {
+            list-style: none;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .task-item:last-child {
+            border-bottom: none;
+        }
+
+        .task-status {
+            width: 12px;
+            height: 12px;
+            margin-right: 15px;
+            position: relative;
+        }
+
+        .task-status.completed {
+            background: var(--accent-green);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .task-status.in-progress {
+            background: var(--accent-orange);
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .task-status.pending {
+            background: var(--text-muted);
+        }
+
+        .task-text {
+            color: var(--text-secondary);
+        }
+
+        .task-text.completed {
+            color: var(--text-primary);
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        /* Issues Section */
+        .issues-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .issues-section::before {
+            content: '⚠ ALERTS';
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 0.7rem;
+            color: var(--accent-red);
+            letter-spacing: 0.3em;
+            animation: alertBlink 2s ease-in-out infinite;
+        }
+
+        @keyframes alertBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 25px;
+            color: var(--text-primary);
+        }
+
+        .issue-item {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 20px;
+            padding: 20px;
+            margin: 15px 0;
+            background: var(--bg-secondary);
+            border-left: 4px solid;
+        }
+
+        .issue-item.critical {
+            border-left-color: var(--accent-red);
+        }
+
+        .issue-item.medium {
+            border-left-color: var(--accent-orange);
+        }
+
+        .issue-severity {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            font-weight: 700;
+            padding: 5px 10px;
+            align-self: start;
+        }
+
+        .issue-item.critical .issue-severity {
+            background: rgba(255, 0, 64, 0.2);
+            color: var(--accent-red);
+        }
+
+        .issue-item.medium .issue-severity {
+            background: rgba(255, 107, 53, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .issue-content {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .issue-content strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* Next Tasks */
+        .next-tasks {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+        }
+
+        .next-tasks::before {
+            content: '>> EXECUTE';
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 0.7rem;
+            color: var(--accent-cyan);
+            letter-spacing: 0.3em;
+        }
+
+        .next-task-item {
+            display: grid;
+            grid-template-columns: 50px 1fr auto;
+            gap: 20px;
+            padding: 20px;
+            margin: 15px 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .next-task-item:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 240, 255, 0.05);
+        }
+
+        .task-number {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--accent-cyan);
+        }
+
+        .task-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .task-command {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--accent-green);
+            background: rgba(0, 255, 136, 0.1);
+            padding: 5px 10px;
+            margin-top: 8px;
+            border-radius: 4px;
+        }
+
+        .task-arrow {
+            color: var(--accent-cyan);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 50px;
+            padding: 30px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .footer-status {
+            color: var(--accent-green);
+        }
+
+        .footer-status::before {
+            content: '● ';
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .phases-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .next-task-item {
+                grid-template-columns: 40px 1fr;
+            }
+            
+            .task-arrow {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-title">
+                <h1>HEIMDALL</h1>
+                <div class="header-subtitle">SERVER_DEPLOYMENT_STATUS // v1.0</div>
+            </div>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="header-stat-value">85%</div>
+                    <div class="header-stat-label">OVERALL</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value">1A</div>
+                    <div class="header-stat-label">PHASE</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value">8</div>
+                    <div class="header-stat-label">TABLES</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value">4</div>
+                    <div class="header-stat-label">SERVICES</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overall Progress -->
+        <div class="progress-section">
+            <div class="progress-header">
+                <div class="progress-title">DEPLOYMENT PROGRESS</div>
+                <div class="progress-percentage">85%</div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: 85%;"></div>
+            </div>
+        </div>
+
+        <!-- Phases -->
+        <div class="phases-grid">
+            <!-- Phase 1A -->
+            <div class="phase-card completed">
+                <div class="phase-header">
+                    <div class="phase-title">PHASE 01-A</div>
+                    <div class="phase-status complete">COMPLETE</div>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px;">SERVER FOUNDATION</div>
+                <ul class="task-list">
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Ubuntu Desktop 26.04 LTS</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">SSH Access (192.168.18.187)</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Docker & Compose</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">SSH Key Auth</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Performance Tuning</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Static IP Config</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Tailscale VPN (100.113.79.103)</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Phase 1A DB -->
+            <div class="phase-card completed">
+                <div class="phase-header">
+                    <div class="phase-title">PHASE 01-A</div>
+                    <div class="phase-status complete">85%</div>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px;">DATABASE & MODELS</div>
+                <ul class="task-list">
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">PostgreSQL Connection</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">SQLAlchemy Models (8 tables)</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Virtual Environment</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status in-progress"></div>
+                        <span class="task-text">pgvector (PostgreSQL extension)</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status pending"></div>
+                        <span class="task-text">nomic-embed-text model</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Phase 1B -->
+            <div class="phase-card completed">
+                <div class="phase-header">
+                    <div class="phase-title">PHASE 01-B</div>
+                    <div class="phase-status complete">COMPLETE</div>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px;">CORE SERVICES</div>
+                <ul class="task-list">
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">PostgreSQL - Port 5432</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Ollama - Port 11434</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Redis - Port 6379</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status completed"></div>
+                        <span class="task-text completed">Langfuse - Port 3001</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Phase 1C -->
+            <div class="phase-card pending">
+                <div class="phase-header">
+                    <div class="phase-title">PHASE 01-C</div>
+                    <div class="phase-status pending">PENDING</div>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px;">APPLICATION LAYER</div>
+                <ul class="task-list">
+                    <li class="task-item">
+                        <div class="task-status pending"></div>
+                        <span class="task-text">Heimdall API Service</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status pending"></div>
+                        <span class="task-text">Environment Variables</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status pending"></div>
+                        <span class="task-text">LLM Integration</span>
+                    </li>
+                    <li class="task-item">
+                        <div class="task-status pending"></div>
+                        <span class="task-text">Web Dashboard</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Issues -->
+        <div class="issues-section">
+            <div class="section-title">SYSTEM ALERTS</div>
+            <div class="issue-item critical">
+                <div class="issue-severity">CRITICAL</div>
+                <div class="issue-content">
+                    <strong>iDRAC Unreachable</strong>
+                    192.168.18.120 not responding. BMC cold reset attempted. Requires physical access for hardware diagnostics.
+                </div>
+            </div>
+            <div class="issue-item medium">
+                <div class="issue-severity">NEXT STEP</div>
+                <div class="issue-content">
+                    <strong>Task 1A.3 — pgvector + Embedding Model</strong>
+                    R620 Xeon E5 lacks AVX2 → Using pgvector (PostgreSQL). Enable: docker exec heimdall-postgres psql -U heimdall -d heimdall -c "CREATE EXTENSION IF NOT EXISTS vector;"
+                </div>
+            </div>
+        </div>
+
+        <!-- Next Tasks -->
+        <div class="next-tasks">
+            <div class="section-title">EXECUTION QUEUE</div>
+            <div class="next-task-item" style="border: 1px solid var(--accent-orange); background: rgba(255,107,53,0.1);">
+                <div class="task-number" style="border-color: var(--accent-orange); color: var(--accent-orange);">01</div>
+                <div class="task-content">
+                    <div style="color: var(--accent-orange); font-weight: 700; margin-bottom: 5px;">→ ENABLE PGVECTOR</div>
+                    <div class="task-command">docker exec heimdall-postgres psql -U heimdall -d heimdall -c "CREATE EXTENSION IF NOT EXISTS vector;"</div>
+                </div>
+                <div class="task-arrow" style="color: var(--accent-orange);">⚡</div>
+            </div>
+            <div class="next-task-item">
+                <div class="task-number">02</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Test Database Connectivity</div>
+                    <div class="task-command">psql -h localhost -U heimdall</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            <div class="next-task-item">
+                <div class="task-number">03</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Download LLM Models</div>
+                    <div class="task-command">ollama pull llama3.2</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Future Phases Overview -->
+        <div class="next-tasks">
+            <div class="section-title">FUTURE PHASES</div>
+            
+            <div class="next-task-item">
+                <div class="task-number">2A</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Memory & Retrieval System</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">LanceDB setup • Semantic search • Chat summarization • Entity graph</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">2B</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Capability Planner & Tools</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Intelligent planning • Tool registry • Permission system • Multi-tool execution</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">3A</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Observability & Monitoring</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Structured logging • Langfuse tracing • Dashboard metrics</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">3B</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Streaming Responses</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Real-time tokens • SSE endpoint • Frontend streaming UI</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">04</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">External Integrations</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Google Maps • Calendar • Health data • Paperless • VSCode Connector</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">05</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Dashboard & UI</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Next.js PWA • Memory browser • Entity explorer • Goals tracker</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">06</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Obsidian Vault Integration</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Auto-journal • Goals tracking • Wiki compilation • Budget snapshots</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">07</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Voice Interface (Future)</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">"Hey Heimdall" wake word • Whisper STT • Nora voice persona</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Service Status -->
+        <div class="issues-section">
+            <div class="section-title">SERVICE_STATUS</div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">CONFIGURED</div>
+                <div class="issue-content">
+                    <strong>PostgreSQL</strong>
+                    Port: 5432 | Status: Container ready | Database: heimdall | User: heimdall
+                </div>
+            </div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">CONFIGURED</div>
+                <div class="issue-content">
+                    <strong>Ollama</strong>
+                    Port: 11434 | Status: Container ready | Models: Pending download
+                </div>
+            </div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">CONFIGURED</div>
+                <div class="issue-content">
+                    <strong>Redis</strong>
+                    Port: 6379 | Status: Container ready | Persistence: AOF enabled
+                </div>
+            </div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">CONFIGURED</div>
+                <div class="issue-content">
+                    <strong>LanceDB</strong>
+                    Port: 8080 | Status: Container ready | Vector storage: Ready
+                </div>
+            </div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">CONFIGURED</div>
+                <div class="issue-content">
+                    <strong>Langfuse</strong>
+                    Port: 3001 | Status: Container ready | Tracing: Pending setup
+                </div>
+            </div>
+        </div>
+
+        <!-- Planned Tools & Models -->
+        <div class="next-tasks">
+            <div class="section-title">PLANNED_TOOLS // MODELS</div>
+            
+            <div class="next-task-item">
+                <div class="task-number">AI</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Core AI Models</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Qwen3.5:7b/32b • nomic-embed-text • DeepSeek V4 • Gemini 2.5 • Claude 4.6 • Groq • Whisper</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">API</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">External APIs</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Google Maps • TfL • OpenWeather • Google Calendar • Garmin • Apple Health</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">APP</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Dashboard Tools</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Chat • Memory browser • Entity explorer • Goals tracker • Health dashboard • Budget view</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">DEV</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">VSCode Connector</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Daemon • Extension • Workspace sync • File operations • Git integration • Terminal execution</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Quick Commands -->
+        <div class="issues-section">
+            <div class="section-title">QUICK_COMMANDS</div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">SSH</div>
+                <div class="issue-content">
+                    <strong>Server Access</strong>
+                    <code style="color: var(--accent-green); background: rgba(0,255,136,0.1); padding: 2px 6px;">ssh heimdall@192.168.18.187</code>
+                    <code style="color: var(--accent-green); background: rgba(0,255,136,0.1); padding: 2px 6px;">ssh heimdall@100.113.79.103</code>
+                </div>
+            </div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">DOCKER</div>
+                <div class="issue-content">
+                    <strong>Container Management</strong>
+                    <code style="color: var(--accent-green); background: rgba(0,255,136,0.1); padding: 2px 6px;">docker-compose up -d</code>
+                    <code style="color: var(--accent-green); background: rgba(0,255,136,0.1); padding: 2px 6px;">docker-compose logs -f</code>
+                </div>
+            </div>
+            
+            <div class="issue-item medium">
+                <div class="issue-severity">MODEL</div>
+                <div class="issue-content">
+                    <strong>Ollama Commands</strong>
+                    <code style="color: var(--accent-green); background: rgba(0,255,136,0.1); padding: 2px 6px;">ollama pull llama3.2</code>
+                    <code style="color: var(--accent-green); background: rgba(0,255,136,0.1); padding: 2px 6px;">ollama list</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Costs -->
+        <div class="next-tasks">
+            <div class="section-title">COST_ANALYSIS // MONTHLY</div>
+            
+            <div class="next-task-item">
+                <div class="task-number">£0</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Free Tier Services</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Vercel • Cloudflare • Gemini • OpenWeather • Groq • Langfuse • Self-hosted</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">£1-3</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">DeepSeek API (Personal Use)</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Flash: $0.14/M • Pro: $1.74/M • Typical personal usage</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">£3-5</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Electricity (R620 Server)</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">32 cores • 60GB RAM • 24/7 operation</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item">
+                <div class="task-number">£16</div>
+                <div class="task-content">
+                    <div style="color: var(--text-primary); font-weight: 700; margin-bottom: 5px;">Claude Pro (Optional)</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Enhanced code generation • VSCode integration</div>
+                </div>
+                <div class="task-arrow">→</div>
+            </div>
+            
+            <div class="next-task-item" style="border: 1px solid var(--accent-green); background: rgba(0,255,136,0.05);">
+                <div class="task-number" style="border-color: var(--accent-green); color: var(--accent-green);">TOTAL</div>
+                <div class="task-content">
+                    <div style="color: var(--accent-green); font-weight: 700; margin-bottom: 5px;">Total Estimated Cost</div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Without Claude Pro: £4-8/mo • With Claude Pro: £20-24/mo</div>
+                </div>
+                <div class="task-arrow" style="color: var(--accent-green);">✓</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div>HEIMDALL_SERVER // 192.168.18.187</div>
+            <div class="footer-status">SYSTEM ONLINE</div>
+            <div>LAST_UPDATE: 2026-05-10 23:03:00 UTC // pgvector replaces LanceDB (R620 AVX2 limitation)</div>
+        </div>
+    </div>
+
+    <script>
+        // Simulate live updates
+        setInterval(() => {
+            const progressBar = document.querySelector('.progress-bar');
+            const currentWidth = parseInt(progressBar.style.width);
+            if (currentWidth < 100) {
+                // Keep it at 75% unless manually updated
+            }
+        }, 30000);
+
+        // Add click interaction to task items
+        document.querySelectorAll('.next-task-item').forEach(item => {
+            item.addEventListener('click', function() {
+                this.style.background = 'rgba(0, 240, 255, 0.15)';
+                setTimeout(() => {
+                    this.style.background = '';
+                }, 300);
+            });
+        });
+    </script>
+</body>
+</html>

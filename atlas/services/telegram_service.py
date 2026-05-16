@@ -795,3 +795,14 @@ async def handle_webhook(update: dict):
     application = create_application()
     async with application:
         await application.process_update(Update.de_json(update, application.bot))
+
+
+async def send_telegram_message(chat_id: str, text: str):
+    """Send a message to a Telegram chat (for brain reminders)."""
+    if not TELEGRAM_BOT_TOKEN:
+        raise ValueError("TELEGRAM_BOT_TOKEN not set")
+    
+    from telegram import Bot
+    
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    await bot.send_message(chat_id=chat_id, text=text, parse_mode=ParseMode.MARKDOWN)

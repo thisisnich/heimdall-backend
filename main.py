@@ -14,11 +14,15 @@ from atlas.api.budget import router as budget_router
 from atlas.api.goals import router as goals_router
 from atlas.api.knowledge_graph import router as graph_router
 from atlas.api.dev import router as dev_router
-from atlas.api.calendar import router as calendar_router
+from atlas.api.brain import router as brain_router
 from atlas.api.telegram import router as telegram_router
+from atlas.api.calendar import router as calendar_router
 from atlas.db.vector_store import init_vector_tables
+from atlas.db.brain_vector import init_brain_vector_tables
 from atlas.db.session import get_session
 from atlas.db.models import User
+from atlas.services.brain_scheduler import brain_scheduler
+from atlas.services.brain_reminder import brain_reminder, proactive_checker
 from sqlalchemy import select
 import uuid
 
@@ -72,6 +76,18 @@ async def startup():
     await init_vector_tables()
     await init_brain_vector_tables()
     await ensure_default_user()
+    
+    # Start brain scheduler
+    await brain_scheduler.start()
+    
+    # Start reminder system (if chat_id is configured)
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if chat_id:
+        brain_reminder.chat_id = chat_id
+        proactive_checker.chat_id = chat_id
+        # Start as background tasks
+        asyncio.create_task(brain_reminder.start())
+        asyncio.create_task(proactive_checker.start())
 
 
 @app.get("/")

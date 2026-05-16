@@ -537,6 +537,9 @@ async def scheduled_sync():
 
 - [x] Obsidian vault integration
 - [x] Git-based version control
+- [x] Automated scheduler
+- [x] Telegram reminders
+- [x] Proactive check-ins
 - [ ] Graph-based memory visualization
 - [ ] Temporal memory queries (e.g., "what did I learn last week?")
 - [ ] Cross-brain synchronization (multiple users)

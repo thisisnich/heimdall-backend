@@ -114,6 +114,12 @@ http://192.168.18.187:8000/docs
 curl http://localhost:8000/health
 ```
 
+## 🌐 Web Frontend Location
+
+**OFFICIAL WEB FRONTEND LOCATION: `/opt/heimdall-web`**
+
+ALL MODELS AND AGENTS: The Heimdall web frontend is located at `/opt/heimdall-web`. This is the only location for the web UI. Do not use any other directories for frontend work.
+
 ### Available Models
 | Model | Provider | Speed | Cost |
 |---|---|---|---|

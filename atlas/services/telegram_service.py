@@ -4,6 +4,7 @@ import asyncio
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -13,7 +14,6 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from telegram.constants import ParseMode
 
 from atlas.db.session import get_session
 from atlas.services.groq_service import chat as groq_chat
@@ -24,6 +24,63 @@ from atlas.services.budget_service import (
     get_monthly_summary,
 )
 from atlas.core.indexer import run_indexer
+
+
+def convert_markdown_tables_to_text(text: str) -> str:
+    """Convert markdown tables to simple text format for Telegram."""
+    import re
+    
+    # Pattern to match markdown tables
+    table_pattern = r'(\|.*?\|\n)+'
+    
+    def replace_table(match):
+        table_text = match.group(0)
+        lines = table_text.strip().split('\n')
+        
+        # Skip separator lines (|---|---|)
+        data_lines = [line for line in lines if '---' not in line]
+        
+        if not data_lines:
+            return table_text
+        
+        # Parse table data
+        rows = []
+        for line in data_lines:
+            # Remove leading/trailing pipes and split
+            cells = [cell.strip() for cell in line.strip('|').split('|')]
+            rows.append(cells)
+        
+        # Find max column width for formatting
+        if not rows:
+            return table_text
+        
+        max_cols = max(len(row) for row in rows)
+        col_widths = [0] * max_cols
+        
+        for row in rows:
+            for i, cell in enumerate(row):
+                if i < max_cols:
+                    col_widths[i] = max(col_widths[i], len(cell))
+        
+        # Build text table
+        result = []
+        for i, row in enumerate(rows):
+            # Pad row to max columns
+            padded_row = row + [''] * (max_cols - len(row))
+            # Format each cell
+            formatted_cells = []
+            for j, cell in enumerate(padded_row):
+                formatted_cells.append(cell.ljust(col_widths[j]))
+            result.append(' | '.join(formatted_cells))
+            # Add separator after header
+            if i == 0:
+                separator = ' | '.join(['-' * w for w in col_widths])
+                result.append(separator)
+        
+        return '\n'.join(result)
+    
+    # Replace all tables
+    return re.sub(table_pattern, replace_table, text)
 
 # Environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -38,6 +95,9 @@ INCOME_AMOUNT, INCOME_DESCRIPTION, INCOME_CATEGORY, INCOME_SOURCE, INCOME_DATE, 
 # Temporary storage for form data
 expense_forms: Dict[int, Dict[str, Any]] = {}
 income_forms: Dict[int, Dict[str, Any]] = {}
+
+# Chat history storage per user
+chat_history: Dict[int, list[dict]] = {}
 
 
 def is_authorized(user_id: int) -> bool:
@@ -128,7 +188,8 @@ async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_message = update.message.text
-    user_id = str(update.effective_user.id)
+    user_id_int = update.effective_user.id
+    user_id = str(user_id_int)
 
     # Show typing indicator
     await update.message.chat.send_action("typing")
@@ -138,30 +199,64 @@ async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from atlas.core.personality import get_system_prompt
         from atlas.db.vector_store import search
 
+        # Get or initialize chat history for this user
+        if user_id_int not in chat_history:
+            chat_history[user_id_int] = []
+
         # Search for relevant context
         async with get_session() as session:
             context_results = await search("vector_memory", user_message, limit=3)
             context_text = "\n".join(f"- {r['text']}" for r in context_results) if context_results else ""
 
             system_prompt = get_system_prompt(context=context_text, with_memory=bool(context_results))
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ]
+
+            # Build messages with history (last 10 messages)
+            history = chat_history[user_id_int][-10:]
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.extend(history)
+            messages.append({"role": "user", "content": user_message})
 
             # Call groq service for chat completion
             response = await groq_chat(messages, model="groq-llama4-scout")
 
-            # Send response
-            await update.message.reply_text(response)
+            # Convert markdown tables to text format for Telegram
+            response = convert_markdown_tables_to_text(response)
+
+            # Send response with markdown parsing (tables are now converted to text)
+            await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
+
+            # Update chat history
+            chat_history[user_id_int].append({"role": "user", "content": user_message})
+            chat_history[user_id_int].append({"role": "assistant", "content": response})
+
+            # Keep history manageable (max 20 messages)
+            if len(chat_history[user_id_int]) > 20:
+                chat_history[user_id_int] = chat_history[user_id_int][-20:]
 
             # Store in memory and trigger auto-indexer
             from atlas.db.vector_store import store
             await store("vector_memory", user_message, source_type="telegram", source_path="telegram")
-            await run_indexer(session, user_id, user_message, response, source="telegram")
+            await run_indexer(user_message, response)
 
     except Exception as e:
         await update.message.reply_text(f"Sorry, something went wrong: {str(e)}")
+
+
+async def brief_command_from_callback(query, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /brief command from callback."""
+    if not is_authorized(query.from_user.id):
+        await query.message.reply_text("Sorry, you're not authorized to use this bot.")
+        return
+
+    await query.message.chat.send_action("typing")
+
+    try:
+        async with get_session() as session:
+            from atlas.api.brief import generate_brief
+            brief = await generate_brief(session, str(query.from_user.id))
+            await query.message.reply_text(brief, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await query.message.reply_text(f"Sorry, couldn't generate brief: {str(e)}")
 
 
 async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -169,9 +264,9 @@ async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update.effective_user.id):
         await update.message.reply_text("Sorry, you're not authorized to use this bot.")
         return
-    
+
     await update.message.chat.send_action("typing")
-    
+
     try:
         async with get_session() as session:
             from atlas.api.brief import generate_brief
@@ -181,18 +276,18 @@ async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Sorry, couldn't generate brief: {str(e)}")
 
 
-async def budget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /budget command."""
-    if not is_authorized(update.effective_user.id):
-        await update.message.reply_text("Sorry, you're not authorized to use this bot.")
+async def budget_command_from_callback(query, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /budget command from callback."""
+    if not is_authorized(query.from_user.id):
+        await query.message.reply_text("Sorry, you're not authorized to use this bot.")
         return
-    
-    await update.message.chat.send_action("typing")
-    
+
+    await query.message.chat.send_action("typing")
+
     try:
         async with get_session() as session:
-            summary = await get_monthly_summary(session, str(update.effective_user.id))
-            
+            summary = await get_monthly_summary(session, str(query.from_user.id))
+
             budget_text = f"""
 📊 *Monthly Budget Summary*
 
@@ -202,13 +297,53 @@ async def budget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 *Transactions:* {summary['transaction_count']}
             """
-            
+
+            await query.message.reply_text(budget_text, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await query.message.reply_text(f"Sorry, couldn't get budget: {str(e)}")
+
+
+async def budget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /budget command."""
+    if not is_authorized(update.effective_user.id):
+        await update.message.reply_text("Sorry, you're not authorized to use this bot.")
+        return
+
+    await update.message.chat.send_action("typing")
+
+    try:
+        async with get_session() as session:
+            summary = await get_monthly_summary(session, str(update.effective_user.id))
+
+            budget_text = f"""
+📊 *Monthly Budget Summary*
+
+*Income:* ${summary['income']:.2f}
+*Expenses:* ${summary['expenses']:.2f}
+*Net:* ${summary['net']:.2f}
+
+*Transactions:* {summary['transaction_count']}
+            """
+
             await update.message.reply_text(budget_text, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         await update.message.reply_text(f"Sorry, couldn't get budget: {str(e)}")
 
 
 # ======== EXPENSE FORM HANDLERS ========
+
+async def expense_start_from_callback(query, context: ContextTypes.DEFAULT_TYPE):
+    """Start expense form from callback."""
+    if not is_authorized(query.from_user.id):
+        await query.message.reply_text("Sorry, you're not authorized to use this bot.")
+        return ConversationHandler.END
+
+    user_id = query.from_user.id
+    expense_forms[user_id] = {}
+
+    await query.message.reply_text("💰 *Add Expense*\n\nHow much did you spend?", parse_mode=ParseMode.MARKDOWN)
+    return EXPENSE_AMOUNT
+
 
 async def expense_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start expense form."""
@@ -405,6 +540,19 @@ async def expense_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======== INCOME FORM HANDLERS ========
 
+async def income_start_from_callback(query, context: ContextTypes.DEFAULT_TYPE):
+    """Start income form from callback."""
+    if not is_authorized(query.from_user.id):
+        await query.message.reply_text("Sorry, you're not authorized to use this bot.")
+        return ConversationHandler.END
+
+    user_id = query.from_user.id
+    income_forms[user_id] = {}
+
+    await query.message.reply_text("💵 *Add Income*\n\nHow much income?", parse_mode=ParseMode.MARKDOWN)
+    return INCOME_AMOUNT
+
+
 async def income_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start income form."""
     if not is_authorized(update.effective_user.id):
@@ -574,17 +722,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if callback_data == "chat":
         await query.message.reply_text("You can now chat with me directly! Just send a message.")
     elif callback_data == "add_expense":
-        await expense_start(update, context)
+        await expense_start_from_callback(query, context)
     elif callback_data == "add_income":
-        await income_start(update, context)
+        await income_start_from_callback(query, context)
     elif callback_data == "brief":
-        await brief_command(update, context)
+        await brief_command_from_callback(query, context)
     elif callback_data == "goals":
         await query.message.reply_text("🎯 Goals feature coming soon!")
     elif callback_data == "search":
         await query.message.reply_text("🔍 Use /search <query> to search your memory")
     elif callback_data == "budget":
-        await budget_command(update, context)
+        await budget_command_from_callback(query, context)
 
 
 # ======== CREATE APPLICATION ========

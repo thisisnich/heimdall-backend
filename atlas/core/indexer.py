@@ -60,6 +60,7 @@ Return a JSON array. Each item has:
 Rules:
 - Extract ONLY if the user mentions spending money or receiving income
 - Look for phrases like "spent", "bought", "paid", "cost", "earned", "received", "salary"
+- DO NOT extract budget limit statements (e.g., "set budget to $75", "budget is $150", "transport budget 75") - these are category settings, not actual transactions
 - If no transaction is mentioned, return an empty array []
 - Amount should be a number only, no $ or other symbols
 

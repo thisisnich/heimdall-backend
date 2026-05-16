@@ -70,6 +70,7 @@ async def ensure_default_user():
 @app.on_event("startup")
 async def startup():
     await init_vector_tables()
+    await init_brain_vector_tables()
     await ensure_default_user()
 
 

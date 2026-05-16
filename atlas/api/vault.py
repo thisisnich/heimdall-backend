@@ -1,17 +1,30 @@
 """
 Vault API — endpoints for triggering and inspecting the Obsidian vault sync.
+Enhanced with GitHub integration and real-time sync.
 """
 import os
 from pathlib import Path
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from atlas.core.vault_writer import sync_vault, VAULT_ROOT
+from atlas.core.vault_manager import VaultManager
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 
 
 class FileUpdate(BaseModel):
     content: str
+
+class ContentRequest(BaseModel):
+    content: str
+    filename: str
+    folder: str = "00-RAW"
+
+class YouTubeRequest(BaseModel):
+    url: str
+
+class InstagramRequest(BaseModel):
+    url: str
 
 
 @router.post("/sync")
@@ -133,6 +146,88 @@ async def update_file(file_path: str, update: FileUpdate):
     try:
         full_path.write_text(update.content, encoding="utf-8")
         return {"status": "success", "path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# New GitHub-based vault endpoints
+vault_manager = VaultManager()
+
+@router.post("/github/add")
+async def add_content_to_vault(request: ContentRequest):
+    """Add content to the GitHub-based vault with automatic classification."""
+    try:
+        result = vault_manager.add_content(
+            request.content,
+            request.filename,
+            request.folder
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/github/upload")
+async def upload_document_to_vault(file: UploadFile = File(...)):
+    """Upload and process a document to the vault using MarkItDown."""
+    try:
+        # Save uploaded file temporarily
+        temp_path = Path(f"/tmp/{file.filename}")
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with vault manager
+        result = vault_manager.process_document(str(temp_path), file.filename)
+        
+        # Clean up temp file
+        temp_path.unlink()
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/github/youtube")
+async def process_youtube_content(request: YouTubeRequest):
+    """Process YouTube content and add to vault."""
+    try:
+        result = vault_manager.process_youtube(request.url)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/github/instagram")
+async def process_instagram_content(request: InstagramRequest):
+    """Process Instagram content and add to vault."""
+    try:
+        result = vault_manager.process_instagram(request.url)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/github/search")
+async def search_vault(query: str):
+    """Search the GitHub vault for content."""
+    try:
+        results = vault_manager.search_vault(query)
+        return {"query": query, "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/github/stats")
+async def get_vault_statistics():
+    """Get vault statistics and health."""
+    try:
+        stats = vault_manager.get_vault_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/github/sync")
+async def sync_github_vault():
+    """Force sync GitHub vault."""
+    try:
+        result = vault_manager.git_commit("Manual sync triggered")
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
